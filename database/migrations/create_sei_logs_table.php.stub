@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (Schema::hasTable('sei_logs')) {
+            return;
+        }
+
+        Schema::create('sei_logs', function (Blueprint $table) {
+            $table->id();
+            // Como o conector identifica a conexão: sei:default, sip:homologacao...
+            $table->string('conexao', 80);
+            $table->string('operacao', 80);
+            $table->boolean('sucesso');
+            $table->unsignedInteger('duracao_ms');
+            // Já mascarados pelo conector (chave de acesso e dados pessoais).
+            $table->json('argumentos')->nullable();
+            $table->string('erro_classe')->nullable();
+            $table->text('erro_mensagem')->nullable();
+            $table->string('fault_code', 80)->nullable();
+            $table->string('user_id', 36)->nullable();
+            $table->timestamp('created_at')->nullable();
+
+            $table->index(['operacao', 'created_at']);
+            $table->index(['sucesso', 'created_at']);
+            $table->index('created_at');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('sei_logs');
+    }
+};
