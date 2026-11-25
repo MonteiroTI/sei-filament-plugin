@@ -48,7 +48,7 @@ Os dois repositórios são privados: o `composer.json` do sistema precisa dos do
 ```
 
 ```bash
-composer require monteiroti/sei-filament-plugin:^1.0@dev
+composer require monteiroti/sei-filament-plugin:^1.0
 php artisan vendor:publish --tag=sei-filament-migrations
 php artisan migrate
 ```
