@@ -96,6 +96,12 @@ abstract class TestCase extends Orchestra
             'parametros' => ['series' => ['oficio' => '12']],
         ]);
 
+        $app['config']->set('sei.sip.connections.default', [
+            'wsdl' => 'https://sip.teste.dev/sip/controlador_ws.php?servico=sip',
+            'chave_acesso' => 'chave-sip-do-env',
+            'id_sistema' => '100000100',
+        ]);
+
         $views = sys_get_temp_dir().'/sei-filament-views-'.InstalledVersions::getVersion('filament/filament');
         is_dir($views) || mkdir($views, 0777, true);
         $app['config']->set('view.compiled', $views);

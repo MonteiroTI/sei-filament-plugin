@@ -7,9 +7,17 @@ use Filament\Contracts\Plugin;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
+use MonteiroTi\Sei\Laravel\Models\SeiProcesso;
+use MonteiroTI\SeiFilament\Avisos\AvisosDoSei;
+use MonteiroTI\SeiFilament\Pages\BlocosSei;
 use MonteiroTI\SeiFilament\Pages\CatalogosSei;
+use MonteiroTI\SeiFilament\Pages\ContatosSei;
+use MonteiroTI\SeiFilament\Pages\ParametrosSei;
+use MonteiroTI\SeiFilament\Pages\SipSei;
 use MonteiroTI\SeiFilament\Resources\ConexoesSei\ConexaoSeiResource;
 use MonteiroTI\SeiFilament\Resources\OperacoesSei\OperacaoSeiResource;
 use MonteiroTI\SeiFilament\Resources\ProcessosSei\ProcessoSeiResource;
@@ -46,6 +54,23 @@ class SeiFilamentPlugin implements Plugin
 
     private bool $vinculos = false;
 
+    private bool $blocos = true;
+
+    private bool $parametros = true;
+
+    private bool $sip = false;
+
+    private bool $contatos = false;
+
+    private ?Closure $autorizarContatos = null;
+
+    private bool $avisos = false;
+
+    /** @var list<string> */
+    private array $tiposDeAviso = AvisosDoSei::PADRAO;
+
+    private ?Closure $destinatariosDosAvisos = null;
+
     /**
      * Subclasses do app no lugar das telas do plugin, pela classe do plugin.
      *
@@ -64,6 +89,12 @@ class SeiFilamentPlugin implements Plugin
     private ?Closure $autorizarVinculos = null;
 
     private ?Closure $autorizarResolverOperacoes = null;
+
+    private ?Closure $autorizarBlocos = null;
+
+    private ?Closure $autorizarOperarProcessos = null;
+
+    private ?Closure $autorizarSip = null;
 
     public static function make(): static
     {
@@ -110,6 +141,10 @@ class SeiFilamentPlugin implements Plugin
             ])))
             ->pages(array_values(array_filter([
                 $this->catalogos ? $this->paginaDeCatalogos() : null,
+                $this->blocos ? $this->classes[BlocosSei::class] ?? BlocosSei::class : null,
+                $this->parametros ? $this->classes[ParametrosSei::class] ?? ParametrosSei::class : null,
+                $this->sip ? $this->classes[SipSei::class] ?? SipSei::class : null,
+                $this->contatos ? $this->classes[ContatosSei::class] ?? ContatosSei::class : null,
             ])))
             ->widgets(array_values(array_filter([
                 $this->widget ? SituacaoSeiWidget::class : null,
@@ -171,6 +206,124 @@ class SeiFilamentPlugin implements Plugin
         $this->vinculos = $ligado;
         $this->usarClasse(ProcessoSeiResource::class, $processos);
         $this->usarClasse(OperacaoSeiResource::class, $operacoes);
+
+        return $this;
+    }
+
+    /**
+     * Parâmetros da conexão (IDs do SEI usados pelo sistema): conferidos contra os catálogos e editáveis no banco. Usa a
+     * permissão da configuração.
+     *
+     * @param  class-string<ParametrosSei>|null  $pagina  subclasse do app no lugar da do plugin
+     */
+    public function parametros(bool $ligado = true, ?string $pagina = null): static
+    {
+        $this->parametros = $ligado;
+        $this->usarClasse(ParametrosSei::class, $pagina);
+
+        return $this;
+    }
+
+    /**
+     * Blocos de assinatura: consulta pelo número, documentos com as assinaturas e as ações do bloco.
+     *
+     * @param  class-string<BlocosSei>|null  $pagina  subclasse do app no lugar da do plugin
+     */
+    public function blocos(bool $ligado = true, ?string $pagina = null): static
+    {
+        $this->blocos = $ligado;
+        $this->usarClasse(BlocosSei::class, $pagina);
+
+        return $this;
+    }
+
+    /**
+     * Usuários e permissões no SIP. Vem desligado: precisa de uma conexão SIP (seção SIP da conexão ou sei.sip).
+     *
+     * @param  class-string<SipSei>|null  $pagina  subclasse do app no lugar da do plugin
+     */
+    public function sip(bool $ligado = true, ?string $pagina = null): static
+    {
+        $this->sip = $ligado;
+        $this->usarClasse(SipSei::class, $pagina);
+
+        return $this;
+    }
+
+    /**
+     * Avisos no sino (notificações de banco do Filament: $panel->databaseNotifications()) quando a sincronização do
+     * conector vê o processo tramitar, concluir, reabrir, um documento ser assinado ou publicado, ou falhar.
+     *
+     * @param  list<string>  $tipos  chaves de AvisosDoSei::TIPOS; padrão: AvisosDoSei::PADRAO (sem "andamento")
+     */
+    public function avisos(bool $ligado = true, array $tipos = AvisosDoSei::PADRAO): static
+    {
+        $this->avisos = $ligado;
+        $this->tiposDeAviso = array_values(array_intersect($tipos, array_keys(AvisosDoSei::TIPOS)));
+
+        return $this;
+    }
+
+    /**
+     * Quem recebe cada aviso. Padrão: quem tem a permissão AvisosDoSei::PERMISSAO pelo spatie/laravel-permission.
+     *
+     * ```php
+     * ->destinatariosDosAvisos(fn (SeiProcesso $processo, string $tipo) => [$processo->vinculavel?->responsavel])
+     * ```
+     *
+     * @param  Closure(SeiProcesso, string): iterable<Model|null>  $consulta
+     */
+    public function destinatariosDosAvisos(Closure $consulta): static
+    {
+        $this->destinatariosDosAvisos = $consulta;
+
+        return $this;
+    }
+
+    public function avisosLigados(): bool
+    {
+        return $this->avisos;
+    }
+
+    /** @return list<string> */
+    public function tiposDeAviso(): array
+    {
+        return $this->tiposDeAviso;
+    }
+
+    /**
+     * @return Collection<int, Model>
+     */
+    public function destinatariosDoAviso(SeiProcesso $processo, string $tipo): Collection
+    {
+        $usuarios = $this->destinatariosDosAvisos !== null
+            ? collect(($this->destinatariosDosAvisos)($processo, $tipo))
+            : AvisosDoSei::comPermissao();
+
+        return $usuarios->filter(fn ($u) => $u instanceof Model)->unique(fn (Model $u) => $u->getKey())->values();
+    }
+
+    /**
+     * Contatos do SEI: busca, edição, desativação e reativação. Vem desligado: são dados pessoais.
+     *
+     * @param  class-string<ContatosSei>|null  $pagina  subclasse do app no lugar da do plugin
+     */
+    public function contatos(bool $ligado = true, ?string $pagina = null): static
+    {
+        $this->contatos = $ligado;
+        $this->usarClasse(ContatosSei::class, $pagina);
+
+        return $this;
+    }
+
+    /**
+     * Quem usa a tela de contatos. Padrão: Gate com ContatosSei::PERMISSAO.
+     *
+     * @param  Closure(Authenticatable): bool  $regra
+     */
+    public function autorizarContatos(Closure $regra): static
+    {
+        $this->autorizarContatos = $regra;
 
         return $this;
     }
@@ -249,6 +402,48 @@ class SeiFilamentPlugin implements Plugin
         $this->autorizarResolverOperacoes = $regra;
 
         return $this;
+    }
+
+    /**
+     * Quem usa a tela de blocos. Padrão: Gate com BlocosSei::PERMISSAO.
+     *
+     * @param  Closure(Authenticatable): bool  $regra
+     */
+    public function autorizarBlocos(Closure $regra): static
+    {
+        $this->autorizarBlocos = $regra;
+
+        return $this;
+    }
+
+    /**
+     * Quem inclui documento, envia, conclui, reabre e põe em bloco nas telas de processos vinculados do plugin (nas
+     * telas do sistema, a autorização das ações é do sistema). Padrão: Gate com ProcessoSeiResource::PERMISSAO_OPERAR.
+     *
+     * @param  Closure(Authenticatable): bool  $regra
+     */
+    public function autorizarOperarProcessos(Closure $regra): static
+    {
+        $this->autorizarOperarProcessos = $regra;
+
+        return $this;
+    }
+
+    /**
+     * Quem usa a tela do SIP. Padrão: Gate com SipSei::PERMISSAO.
+     *
+     * @param  Closure(Authenticatable): bool  $regra
+     */
+    public function autorizarSip(Closure $regra): static
+    {
+        $this->autorizarSip = $regra;
+
+        return $this;
+    }
+
+    public function temBlocos(): bool
+    {
+        return $this->blocos;
     }
 
     public function temVinculos(): bool
@@ -337,6 +532,26 @@ class SeiFilamentPlugin implements Plugin
     public function podeVerVinculos(?Authenticatable $user): bool
     {
         return $this->pode($user, $this->autorizarVinculos, ProcessoSeiResource::PERMISSAO);
+    }
+
+    public function podeGerenciarBlocos(?Authenticatable $user): bool
+    {
+        return $this->pode($user, $this->autorizarBlocos, BlocosSei::PERMISSAO);
+    }
+
+    public function podeOperarProcessos(?Authenticatable $user): bool
+    {
+        return $this->pode($user, $this->autorizarOperarProcessos, ProcessoSeiResource::PERMISSAO_OPERAR);
+    }
+
+    public function podeAdministrarSip(?Authenticatable $user): bool
+    {
+        return $this->pode($user, $this->autorizarSip, SipSei::PERMISSAO);
+    }
+
+    public function podeGerenciarContatos(?Authenticatable $user): bool
+    {
+        return $this->pode($user, $this->autorizarContatos, ContatosSei::PERMISSAO);
     }
 
     public function podeResolverOperacoes(?Authenticatable $user): bool

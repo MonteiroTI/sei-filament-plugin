@@ -9,7 +9,7 @@
     "require": {
         "php": "^8.2",
         "filament/filament": "^3.3",
-        "monteiroti/sei-integration": "dev-main"
+        "monteiroti/sei-integration": "^0.1"
     },
     "require-dev": {
         "laravel/pint": "^1.18",

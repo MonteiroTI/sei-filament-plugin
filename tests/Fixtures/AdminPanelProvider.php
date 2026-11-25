@@ -21,6 +21,6 @@ class AdminPanelProvider extends PanelProvider
             ->middleware([EncryptCookies::class, StartSession::class, ShareErrorsFromSession::class])
             ->pages([Dashboard::class])
             ->resources([ProcessoResource::class])
-            ->plugin(SeiFilamentPlugin::make()->navigationGroup('Integrações')->vinculos());
+            ->plugin(SeiFilamentPlugin::make()->navigationGroup('Integrações')->vinculos()->sip()->contatos());
     }
 }

@@ -1,28 +1,5 @@
 <x-filament-panels::page>
-    <div class="grid gap-4 md:grid-cols-2">
-        <label class="grid gap-y-2">
-            <span class="text-sm font-medium leading-6 text-gray-950 dark:text-white">Conexão</span>
-            <x-filament::input.wrapper>
-                <x-filament::input.select wire:model.live="conexao">
-                    @foreach ($this->conexoes as $nome => $rotulo)
-                        <option value="{{ $nome }}">{{ $rotulo }}</option>
-                    @endforeach
-                </x-filament::input.select>
-            </x-filament::input.wrapper>
-        </label>
-
-        <label class="grid gap-y-2">
-            <span class="text-sm font-medium leading-6 text-gray-950 dark:text-white">Unidade</span>
-            <x-filament::input.wrapper>
-                <x-filament::input.select wire:model.live="unidade">
-                    <option value="">Unidade padrão da conexão</option>
-                    @foreach ($this->unidades as $id => $rotulo)
-                        <option value="{{ $id }}">{{ $rotulo }} ({{ $id }})</option>
-                    @endforeach
-                </x-filament::input.select>
-            </x-filament::input.wrapper>
-        </label>
-    </div>
+    @include('sei-filament::partials.conexao-unidade')
 
     <x-filament::tabs>
         @foreach (\MonteiroTI\SeiFilament\Support\CatalogosDoSei::CATALOGOS as $chave => $catalogo)

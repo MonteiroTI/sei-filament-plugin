@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use MonteiroTi\Sei\Enum\EstadoPublicacao;
 use MonteiroTi\Sei\Enum\TipoDocumento;
 use MonteiroTi\Sei\Laravel\Models\SeiDocumento;
+use MonteiroTI\SeiFilament\Actions\AgendarPublicacaoSeiAction;
+use MonteiroTI\SeiFilament\Actions\CancelarPublicacaoSeiAction;
+use MonteiroTI\SeiFilament\Actions\IncluirEmBlocoSeiAction;
+use MonteiroTI\SeiFilament\Resources\ProcessosSei\ProcessoSeiResource;
 use MonteiroTI\SeiFilament\Support\Rotulos;
 
 /**
@@ -68,6 +72,16 @@ class DocumentosRelationManager extends RelationManager
                     ->since()
                     ->placeholder('nunca')
                     ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->actions([
+                Tables\Actions\ActionGroup::make([
+                    IncluirEmBlocoSeiAction::tabela(),
+                    AgendarPublicacaoSeiAction::tabela(),
+                    CancelarPublicacaoSeiAction::tabela(),
+                ])->visible(fn () => ProcessoSeiResource::podeOperar()),
+            ])
+            ->bulkActions([
+                IncluirEmBlocoSeiAction::emMassa()->visible(fn () => ProcessoSeiResource::podeOperar()),
             ])
             ->emptyStateHeading('Nenhum documento vinculado')
             ->emptyStateDescription('Aparecem aqui os documentos incluídos pelo sistema (Sei::integracao()->incluirDocumento).');

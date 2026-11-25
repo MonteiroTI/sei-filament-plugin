@@ -42,7 +42,13 @@ final class ConexoesNoConfig
 
         foreach ($conexoes as $conexao) {
             $chave = "sei.connections.{$conexao->nome}";
-            config()->set($chave, array_merge((array) config($chave, []), $conexao->paraConfigSei()));
+            $atual = (array) config($chave, []);
+            config()->set($chave, [
+                ...$atual,
+                ...$conexao->paraConfigSei(),
+                // Parâmetro a parâmetro: os do banco valem por cima dos do config.
+                'parametros' => array_replace_recursive((array) ($atual['parametros'] ?? []), $conexao->parametros ?? []),
+            ]);
 
             if ($conexao->temSip()) {
                 $chave = "sei.sip.connections.{$conexao->nome}";
@@ -80,6 +86,21 @@ final class ConexoesNoConfig
         $manager = app(SeiManager::class);
         $padrao = $manager->getDefaultConnection();
         $nomes = array_keys((array) config('sei.connections', []));
+        usort($nomes, fn ($a, $b) => [$a !== $padrao, $a] <=> [$b !== $padrao, $b]);
+
+        return array_combine($nomes, array_map(fn ($nome) => $nome === $padrao ? "{$nome} (padrão)" : $nome, $nomes));
+    }
+
+    /**
+     * Nomes das conexões SIP (banco + config), a padrão primeiro.
+     *
+     * @return array<string, string>
+     */
+    public static function nomesSip(): array
+    {
+        app(SeiManager::class);
+        $padrao = (string) config('sei.sip.default', 'default');
+        $nomes = array_keys(array_filter((array) config('sei.sip.connections', []), fn ($c) => is_array($c) && filled($c['wsdl'] ?? null)));
         usort($nomes, fn ($a, $b) => [$a !== $padrao, $a] <=> [$b !== $padrao, $b]);
 
         return array_combine($nomes, array_map(fn ($nome) => $nome === $padrao ? "{$nome} (padrão)" : $nome, $nomes));

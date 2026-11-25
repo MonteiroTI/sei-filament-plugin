@@ -8,6 +8,8 @@ use MonteiroTi\Sei\Core\Exceptions\AccessDeniedException;
 use MonteiroTi\Sei\Core\Exceptions\ConnectionException;
 use MonteiroTi\Sei\Core\Exceptions\FaultException;
 use MonteiroTi\Sei\Core\Exceptions\SeiException;
+use MonteiroTi\Sei\Laravel\Integracao\OperacaoEmAndamentoException;
+use MonteiroTi\Sei\Laravel\Integracao\OperacaoIncertaException;
 use Throwable;
 
 /**
@@ -24,6 +26,8 @@ final class Erros
     public static function titulo(Throwable $e): string
     {
         return match (true) {
+            $e instanceof OperacaoIncertaException => 'O SEI pode ter executado a operação: confira em Operações antes de tentar de novo',
+            $e instanceof OperacaoEmAndamentoException => 'A mesma operação já está em andamento',
             $e instanceof AccessDeniedException => 'Acesso negado pelo SEI',
             $e instanceof ConnectionException => 'Não foi possível falar com o SEI',
             $e instanceof FaultException => 'O SEI recusou a operação',
@@ -44,7 +48,8 @@ final class Erros
         Notification::make()
             ->danger()
             ->title($titulo ?? self::titulo($e))
-            ->body(nl2br(e(self::mensagem($e))))
+            // Com título próprio, o motivo (ex.: operação incerta) vai no corpo.
+            ->body(nl2br(e(($titulo !== null ? self::titulo($e).".\n" : '').self::mensagem($e))))
             ->persistent()
             ->send();
     }

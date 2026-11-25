@@ -25,6 +25,7 @@ use MonteiroTI\SeiFilament\Support\ConexoesNoConfig;
  * @property bool $verify_ssl
  * @property bool $somente_leitura
  * @property list<string>|null $operacoes
+ * @property array<string, array<string, string>>|null $parametros
  * @property string|null $sip_wsdl
  * @property string|null $sip_chave_acesso
  * @property string|null $sip_id_sistema
@@ -61,6 +62,7 @@ class ConexaoSei extends Model
             'verify_ssl' => 'boolean',
             'somente_leitura' => 'boolean',
             'operacoes' => 'array',
+            'parametros' => 'array',
             'sip_chave_acesso' => 'encrypted',
             'testada_em' => 'datetime',
             'teste_ok' => 'boolean',

@@ -5,6 +5,7 @@ namespace MonteiroTI\SeiFilament;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use MonteiroTi\Sei\Laravel\SeiManager;
+use MonteiroTI\SeiFilament\Avisos\AvisosDoSei;
 use MonteiroTI\SeiFilament\Logs\GravarChamadasSei;
 use MonteiroTI\SeiFilament\Support\ConexoesNoConfig;
 
@@ -23,6 +24,7 @@ class SeiFilamentServiceProvider extends ServiceProvider
 
         // Subscriber global: as chamadas também saem da fila e do agendador, fora de qualquer painel.
         Event::subscribe(GravarChamadasSei::class);
+        Event::subscribe(AvisosDoSei::class);
 
         if ($this->app->runningInConsole()) {
             $this->publishesMigrations([

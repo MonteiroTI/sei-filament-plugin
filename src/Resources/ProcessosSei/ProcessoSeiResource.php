@@ -35,6 +35,9 @@ class ProcessoSeiResource extends Resource
 
     public const PERMISSAO = 'ver_vinculos:sei';
 
+    /** Incluir documento, enviar, concluir, reabrir e pôr em bloco a partir destas telas. */
+    public const PERMISSAO_OPERAR = 'operar_processos:sei';
+
     protected static ?string $slug = 'sei-processos';
 
     protected static ?string $modelLabel = 'processo do SEI';
@@ -226,6 +229,11 @@ class ProcessoSeiResource extends Resource
 
                 Notification::make()->success()->title("Processo {$record->protocolo_formatado} sincronizado")->send();
             });
+    }
+
+    public static function podeOperar(): bool
+    {
+        return SeiFilamentPlugin::configurado()?->podeOperarProcessos(Filament::auth()->user()) ?? false;
     }
 
     public static function unidadesAbertas(SeiProcesso $processo): ?string

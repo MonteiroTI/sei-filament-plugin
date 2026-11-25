@@ -8,12 +8,10 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
-use MonteiroTi\Sei\Laravel\SeiManager;
-use MonteiroTi\Sei\SeiClient;
+use MonteiroTI\SeiFilament\Concerns\EscolheConexaoEUnidade;
 use MonteiroTI\SeiFilament\SeiFilamentPlugin;
 use MonteiroTI\SeiFilament\Support\CacheDosCatalogos;
 use MonteiroTI\SeiFilament\Support\CatalogosDoSei;
-use MonteiroTI\SeiFilament\Support\ConexoesNoConfig;
 use MonteiroTI\SeiFilament\Support\Erros;
 use Throwable;
 
@@ -22,6 +20,8 @@ use Throwable;
  */
 class CatalogosSei extends Page
 {
+    use EscolheConexaoEUnidade;
+
     public const PERMISSAO = 'consultar_catalogos:sei';
 
     /** Linhas mostradas de uma vez; a busca acha as outras. */
@@ -38,10 +38,6 @@ class CatalogosSei extends Page
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
     protected static ?int $navigationSort = 20;
-
-    public ?string $conexao = null;
-
-    public ?string $unidade = null;
 
     public string $catalogo = 'unidades';
 
@@ -61,13 +57,11 @@ class CatalogosSei extends Page
 
     public function mount(): void
     {
-        $this->conexao = app(SeiManager::class)->getDefaultConnection();
-        $this->unidade = $this->unidadePadrao();
+        $this->iniciarConexao();
     }
 
-    public function updatedConexao(): void
+    protected function aoTrocarConexao(): void
     {
-        $this->unidade = $this->unidadePadrao();
         $this->busca = '';
     }
 
@@ -99,28 +93,6 @@ class CatalogosSei extends Page
                     Notification::make()->success()->title('Cache dos catálogos limpo')->send();
                 }),
         ];
-    }
-
-    /** @return array<string, string> */
-    #[Computed]
-    public function conexoes(): array
-    {
-        return ConexoesNoConfig::nomes();
-    }
-
-    /** @return array<string, string> */
-    #[Computed]
-    public function unidades(): array
-    {
-        try {
-            return CatalogosDoSei::opcoes($this->cliente()->catalogos(), 'unidades');
-        } catch (Throwable $e) {
-            if (! Erros::trata($e)) {
-                throw $e;
-            }
-
-            return [];
-        }
     }
 
     /**
@@ -159,22 +131,5 @@ class CatalogosSei extends Page
     public function colunas(): array
     {
         return CatalogosDoSei::CATALOGOS[$this->catalogo]['colunas'];
-    }
-
-    protected function cliente(): SeiClient
-    {
-        $conexao = $this->conexao !== null && array_key_exists($this->conexao, $this->conexoes) ? $this->conexao : null;
-        $cliente = app(SeiManager::class)->connection($conexao);
-
-        return filled($this->unidade) ? $cliente->naUnidade((string) $this->unidade) : $cliente;
-    }
-
-    private function unidadePadrao(): ?string
-    {
-        try {
-            return app(SeiManager::class)->connectionConfig((string) $this->conexao)['id_unidade'] ?? null;
-        } catch (\InvalidArgumentException) {
-            return null;
-        }
     }
 }

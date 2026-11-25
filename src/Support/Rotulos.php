@@ -15,6 +15,8 @@ use MonteiroTi\Sei\Enum\TipoBloco;
 use MonteiroTi\Sei\Enum\TipoDocumento;
 use MonteiroTi\Sei\Enum\TipoVeiculo;
 use MonteiroTi\Sei\Laravel\Models\StatusOperacao;
+use MonteiroTi\Sei\Sip\Enum\OperacaoPermissao;
+use MonteiroTi\Sei\Sip\Enum\OperacaoUsuario;
 
 /**
  * Rótulo e cor (do Filament) dos enums do conector, que não têm label(): para selects, badges e textos.
@@ -92,6 +94,17 @@ final class Rotulos
                 StatusOperacao::Falhou => 'Falhou',
                 StatusOperacao::Incerta => 'Incerta',
                 StatusOperacao::Descartada => 'Descartada',
+            },
+            $valor instanceof OperacaoUsuario => match ($valor) {
+                OperacaoUsuario::Cadastrar => 'Cadastrar',
+                OperacaoUsuario::Atualizar => 'Atualizar',
+                OperacaoUsuario::Excluir => 'Excluir',
+                OperacaoUsuario::Desativar => 'Desativar',
+                OperacaoUsuario::Reativar => 'Reativar',
+            },
+            $valor instanceof OperacaoPermissao => match ($valor) {
+                OperacaoPermissao::Atualizar => 'Conceder ou atualizar',
+                OperacaoPermissao::Excluir => 'Retirar',
             },
             default => (string) $valor->value,
         };
