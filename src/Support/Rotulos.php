@@ -14,6 +14,7 @@ use MonteiroTi\Sei\Enum\OperacaoContato;
 use MonteiroTi\Sei\Enum\TipoBloco;
 use MonteiroTi\Sei\Enum\TipoDocumento;
 use MonteiroTi\Sei\Enum\TipoVeiculo;
+use MonteiroTi\Sei\Laravel\Models\StatusOperacao;
 
 /**
  * Rótulo e cor (do Filament) dos enums do conector, que não têm label(): para selects, badges e textos.
@@ -85,6 +86,13 @@ final class Rotulos
                 OperacaoContato::Desativar => 'Desativar',
                 OperacaoContato::Reativar => 'Reativar',
             },
+            $valor instanceof StatusOperacao => match ($valor) {
+                StatusOperacao::Executando => 'Executando',
+                StatusOperacao::Concluida => 'Concluída',
+                StatusOperacao::Falhou => 'Falhou',
+                StatusOperacao::Incerta => 'Incerta',
+                StatusOperacao::Descartada => 'Descartada',
+            },
             default => (string) $valor->value,
         };
     }
@@ -93,10 +101,10 @@ final class Rotulos
     public static function cor(?BackedEnum $valor): string
     {
         return match ($valor) {
-            NivelAcesso::Publico, EstadoBloco::Concluido, EstadoPublicacao::Publicado => 'success',
-            NivelAcesso::Restrito, EstadoBloco::Disponibilizado, EstadoBloco::Retornado, EstadoPublicacao::Agendado => 'warning',
-            NivelAcesso::Sigiloso => 'danger',
-            EstadoBloco::Aberto, EstadoBloco::Recebido => 'info',
+            NivelAcesso::Publico, EstadoBloco::Concluido, EstadoPublicacao::Publicado, StatusOperacao::Concluida => 'success',
+            NivelAcesso::Restrito, EstadoBloco::Disponibilizado, EstadoBloco::Retornado, EstadoPublicacao::Agendado, StatusOperacao::Incerta => 'warning',
+            NivelAcesso::Sigiloso, StatusOperacao::Falhou => 'danger',
+            EstadoBloco::Aberto, EstadoBloco::Recebido, StatusOperacao::Executando => 'info',
             default => 'gray',
         };
     }

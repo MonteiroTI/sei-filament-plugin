@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 use MonteiroTI\SeiFilament\Pages\CatalogosSei;
 use MonteiroTI\SeiFilament\Resources\ConexoesSei\ConexaoSeiResource;
+use MonteiroTI\SeiFilament\Resources\OperacoesSei\OperacaoSeiResource;
+use MonteiroTI\SeiFilament\Resources\ProcessosSei\ProcessoSeiResource;
 use MonteiroTI\SeiFilament\Resources\SeiLogs\SeiLogResource;
 use MonteiroTI\SeiFilament\Widgets\SituacaoSeiWidget;
 
@@ -42,6 +44,8 @@ class SeiFilamentPlugin implements Plugin
 
     private bool $widget = true;
 
+    private bool $vinculos = false;
+
     /**
      * Subclasses do app no lugar das telas do plugin, pela classe do plugin.
      *
@@ -56,6 +60,10 @@ class SeiFilamentPlugin implements Plugin
     private ?Closure $autorizarCatalogos = null;
 
     private ?Closure $autorizarLogs = null;
+
+    private ?Closure $autorizarVinculos = null;
+
+    private ?Closure $autorizarResolverOperacoes = null;
 
     public static function make(): static
     {
@@ -97,6 +105,8 @@ class SeiFilamentPlugin implements Plugin
             ->resources(array_values(array_filter([
                 $this->conexoes ? $this->recursoDeConexoes() : null,
                 $this->logs ? $this->recursoDeLogs() : null,
+                $this->vinculos ? $this->recursoDeProcessos() : null,
+                $this->vinculos ? $this->recursoDeOperacoes() : null,
             ])))
             ->pages(array_values(array_filter([
                 $this->catalogos ? $this->paginaDeCatalogos() : null,
@@ -145,6 +155,22 @@ class SeiFilamentPlugin implements Plugin
         $this->logs = $ligado;
         $this->diasDeLog = max(1, $dias);
         $this->usarClasse(SeiLogResource::class, $resource);
+
+        return $this;
+    }
+
+    /**
+     * Processos e documentos vinculados e operações com idempotência (módulo de persistência do conector:
+     * php artisan vendor:publish --tag=sei-migrations). Vem desligado porque as tabelas são opcionais no conector.
+     *
+     * @param  class-string<ProcessoSeiResource>|null  $processos  subclasse do app no lugar da do plugin
+     * @param  class-string<OperacaoSeiResource>|null  $operacoes  subclasse do app no lugar da do plugin
+     */
+    public function vinculos(bool $ligado = true, ?string $processos = null, ?string $operacoes = null): static
+    {
+        $this->vinculos = $ligado;
+        $this->usarClasse(ProcessoSeiResource::class, $processos);
+        $this->usarClasse(OperacaoSeiResource::class, $operacoes);
 
         return $this;
     }
@@ -200,6 +226,36 @@ class SeiFilamentPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * Quem vê os processos vinculados e as operações (e sincroniza um processo). Padrão: Gate com
+     * ProcessoSeiResource::PERMISSAO.
+     *
+     * @param  Closure(Authenticatable): bool  $regra
+     */
+    public function autorizarVinculos(Closure $regra): static
+    {
+        $this->autorizarVinculos = $regra;
+
+        return $this;
+    }
+
+    /**
+     * Quem resolve uma operação incerta depois de conferir no SEI. Padrão: Gate com OperacaoSeiResource::PERMISSAO_RESOLVER.
+     *
+     * @param  Closure(Authenticatable): bool  $regra
+     */
+    public function autorizarResolverOperacoes(Closure $regra): static
+    {
+        $this->autorizarResolverOperacoes = $regra;
+
+        return $this;
+    }
+
+    public function temVinculos(): bool
+    {
+        return $this->vinculos;
+    }
+
     public function temLogs(): bool
     {
         return $this->logs;
@@ -225,6 +281,18 @@ class SeiFilamentPlugin implements Plugin
     public function recursoDeLogs(): string
     {
         return $this->classes[SeiLogResource::class] ?? SeiLogResource::class;
+    }
+
+    /** @return class-string<ProcessoSeiResource> */
+    public function recursoDeProcessos(): string
+    {
+        return $this->classes[ProcessoSeiResource::class] ?? ProcessoSeiResource::class;
+    }
+
+    /** @return class-string<OperacaoSeiResource> */
+    public function recursoDeOperacoes(): string
+    {
+        return $this->classes[OperacaoSeiResource::class] ?? OperacaoSeiResource::class;
     }
 
     /** @return class-string<CatalogosSei> */
@@ -264,6 +332,16 @@ class SeiFilamentPlugin implements Plugin
     public function podeVerLogs(?Authenticatable $user): bool
     {
         return $this->pode($user, $this->autorizarLogs, SeiLogResource::PERMISSAO);
+    }
+
+    public function podeVerVinculos(?Authenticatable $user): bool
+    {
+        return $this->pode($user, $this->autorizarVinculos, ProcessoSeiResource::PERMISSAO);
+    }
+
+    public function podeResolverOperacoes(?Authenticatable $user): bool
+    {
+        return $this->pode($user, $this->autorizarResolverOperacoes, OperacaoSeiResource::PERMISSAO_RESOLVER);
     }
 
     private function pode(?Authenticatable $user, ?Closure $regra, string $permissao): bool

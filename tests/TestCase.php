@@ -51,6 +51,9 @@ abstract class TestCase extends Orchestra
             (require dirname(__DIR__)."/database/migrations/{$migration}.php.stub")->up();
         }
 
+        // Módulo de persistência do conector (vínculos e idempotência).
+        (require dirname(__DIR__).'/vendor/monteiroti/sei-integration/database/migrations/create_sei_tables.php.stub')->up();
+
         // Permissão = nome na lista do usuário (sem pacote de permissões).
         Gate::before(fn (User $user, string $ability) => in_array($ability, $user->permissoes ?? [], true) ? true : null);
 

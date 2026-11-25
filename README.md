@@ -8,6 +8,8 @@ Plugin do Filament 3 para o [conector do SEI](https://github.com/MonteiroTI/sei-
 | **Catálogos** | Unidades, tipos de documento, tipos de processo, hipóteses legais, marcadores, usuários... por conexão e unidade, com busca e **Limpar cache** | `consultar_catalogos:sei` |
 | **Log das chamadas** | Cada chamada ao SEI/SIP, com tempo, erro e argumentos (mascarados pelo conector) | `ver_log:sei` |
 | **Widget** | No dashboard: último teste da conexão padrão, falhas e tempo médio nas últimas 24 h | quem configura ou vê o log |
+| **Processos vinculados** (com `->vinculos()`) | Processos e documentos que o sistema gerou ou acompanha, com **Consultar no SEI** e **Sincronizar** | `ver_vinculos:sei` |
+| **Operações** (com `->vinculos()`) | Operações com idempotência; as incertas aparecem no menu e são resolvidas na tela | `ver_vinculos:sei`; resolver: `resolver_operacoes:sei` |
 
 | Peça para as telas do sistema | Uso |
 |---|---|
@@ -56,12 +58,15 @@ SeiFilamentPlugin::make()
     ->catalogos()                              // tela de catálogos
     ->logs(dias: 30)                           // log das chamadas; registros mais velhos são apagados aos poucos
     ->widget(false)                            // sem o widget no dashboard
+    ->vinculos()                               // processos vinculados e operações (desligado por padrão)
     ->autorizarConfiguracao(fn (User $user) => $user->isAdmin())
     ->autorizarCatalogos(fn (User $user) => true)
-    ->autorizarLogs(fn (User $user) => $user->isAdmin());
+    ->autorizarLogs(fn (User $user) => $user->isAdmin())
+    ->autorizarVinculos(fn (User $user) => true)
+    ->autorizarResolverOperacoes(fn (User $user) => $user->isAdmin());
 ```
 
-Tudo vem ligado. Sem `autorizarX`, cada tela pergunta ao `Gate` pela permissão da tabela acima (constante `PERMISSAO` da classe), o que funciona com o spatie/laravel-permission ou com uma policy/gate do sistema.
+Tudo vem ligado, menos os vínculos. Sem `autorizarX`, cada tela pergunta ao `Gate` pela permissão da tabela acima (constante `PERMISSAO` da classe), o que funciona com o spatie/laravel-permission ou com uma policy/gate do sistema.
 
 ### Subclasse do app no lugar de uma tela
 
@@ -71,7 +76,8 @@ Cada tela aceita uma subclasse, por exemplo para implementar o `HasShieldPermiss
 SeiFilamentPlugin::make()
     ->conexoes(resource: App\Filament\Resources\ConexaoSeiResource::class)
     ->logs(resource: App\Filament\Resources\SeiLogResource::class)
-    ->catalogos(pagina: App\Filament\Pages\CatalogosSei::class);
+    ->catalogos(pagina: App\Filament\Pages\CatalogosSei::class)
+    ->vinculos(processos: App\Filament\Resources\ProcessoSeiResource::class, operacoes: App\Filament\Resources\OperacaoSeiResource::class);
 ```
 
 A subclasse precisa estender a classe do plugin.
@@ -99,6 +105,26 @@ A tela consulta os catálogos com o cache do conector (`sei.cache`). Para unidad
 Gravado pelos eventos do conector (`sei.events`, ligado por padrão), inclusive das chamadas da fila e do agendador. Grava operação, conexão, tempo, usuário, erro e os argumentos como o conector os registra: chave de acesso e dados pessoais mascarados (`sei.log.dados_pessoais`), Base64 resumido. O retorno do SEI não é gravado.
 
 Com `->logs(false)` a tela some e nada é gravado.
+
+## Processos vinculados e operações
+
+Telas do módulo de persistência do conector (`Sei::integracao()`), que é opcional: publique as migrations dele antes de ligar.
+
+```bash
+php artisan vendor:publish --tag=sei-migrations
+php artisan migrate
+```
+
+```php
+SeiFilamentPlugin::make()->vinculos();
+```
+
+- **Processos vinculados**: processo, registro do sistema (com link para a tela dele, se houver um resource), nível de acesso, situação, onde está aberto e a última sincronização. Na tela do processo, os documentos com assinatura e publicação.
+  - **Sincronizar** faz o mesmo que o `sei:sincronizar` com o processo, na hora, e religa a sincronização que o conector desligou por erro.
+- **Operações**: as chamadas com idempotência (`gerarProcesso`, `incluirDocumento`...). Uma operação **incerta** (timeout depois do envio: o SEI pode ou não ter executado) trava novas tentativas com a mesma chave; o menu mostra quantas há.
+  - **Resolver** faz o mesmo que o `sei:operacoes:resolver`, depois de conferir no SEI: informar o processo ou documento que o SEI criou (vira vínculo), marcar como executada, ou descartar para liberar nova tentativa.
+
+Os models seguem `sei.persistencia.models` do conector, inclusive subclasses do sistema.
 
 ## Consultar processo
 
