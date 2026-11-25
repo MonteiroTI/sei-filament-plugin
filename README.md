@@ -34,7 +34,7 @@ Plugin do Filament 3 para o [conector do SEI](https://github.com/MonteiroTI/sei-
 
 | Plugin | Filament | Laravel | Conector |
 |---|---|---|---|
-| 1.x (`main`) | 3.3 | 12 | `^0.1` |
+| 1.x (`main`) | 3.3 | 12 | `^0.1 \|\| ^0.2` |
 
 ## Instalação
 
